@@ -1,7 +1,7 @@
-import { Play, Clock, Package, Newspaper, ExternalLink, Zap, Gamepad2 } from 'lucide-react';
-import { useAppStore } from '../stores/appStore';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useAppStore } from '../stores/appStore';
+import type { Instance } from '../types';
 
 interface MojangArticle {
   title: string;
@@ -11,11 +11,27 @@ interface MojangArticle {
   category: string;
 }
 
+const BLOCK_GRID = [
+  ['x', 'x', 'x', 'x', 'x', 'e', 'x', 'x'],
+  ['x', 'x', 'x', 'w', 'w', 'x', 'x', 'x'],
+  ['x', 'g', 'g', 'g', 'g', 'g', 'g', 'x'],
+  ['d', 'd', 'd', 'd', 'd', 'd', 'd', 'd'],
+  ['s', 's', 's', 's', 's', 's', 's', 's'],
+];
+
 export function Home() {
-  const { instances, getLastPlayedInstance, setView } = useAppStore();
+  const { instances, getLastPlayedInstance, selectedInstance, accounts, activeAccount } = useAppStore();
   const [news, setNews] = useState<MojangArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [launching, setLaunching] = useState(false);
+  const [launchProgress, setLaunchProgress] = useState(0);
+  const [launchStatus, setLaunchStatus] = useState('Preparing...');
+  const [selectedVersion, setSelectedVersion] = useState<Instance | null>(null);
+  const [ramAllocation, setRamAllocation] = useState(4);
+  
+  const activeAcc = accounts.find(a => a.id === activeAccount);
   const lastPlayed = getLastPlayedInstance();
+  const currentInstance = selectedVersion || lastPlayed || instances[0];
 
   useEffect(() => {
     fetchMojangNews();
@@ -23,161 +39,383 @@ export function Home() {
 
   const fetchMojangNews = async () => {
     try {
-      // Try to fetch from Mojang's RSS feed via backend
       const articles = await invoke<MojangArticle[]>('fetch_mojang_news');
-      setNews(articles.slice(0, 5));
-    } catch (error) {
-      // Fallback to mock data if fetch fails
-      setNews([
-        {
-          title: 'Minecraft 1.21 Update: The Tricky Trials',
-          description: 'Explore new trial chambers, meet the breeze, and craft with the mace!',
-          url: 'https://www.minecraft.net/article/tricky-trials-update',
-          publishedAt: new Date().toISOString(),
-          category: 'Update',
-        },
-        {
-          title: 'New Realms Subscription Tiers',
-          description: 'More options for your Minecraft Realms subscription.',
-          url: 'https://www.minecraft.net/article/realms-plus',
-          publishedAt: new Date(Date.now() - 86400000).toISOString(),
-          category: 'News',
-        },
-        {
-          title: 'Minecraft Marketplace Highlights',
-          description: 'Check out the latest community creations.',
-          url: 'https://www.minecraft.net/marketplace',
-          publishedAt: new Date(Date.now() - 172800000).toISOString(),
-          category: 'Marketplace',
-        },
-      ]);
+      setNews(articles.slice(0, 3));
+    } catch {
+      setNews([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const totalPlayTime = instances.reduce((acc, inst) => acc + inst.playTime, 0);
-  const totalMods = instances.reduce((acc, inst) => acc + inst.mods.length, 0);
+  const handleLaunch = async () => {
+    if (!currentInstance) return;
+    
+    setLaunching(true);
+    setLaunchProgress(0);
+    
+    const steps = [
+      'Authenticating...',
+      'Downloading assets...',
+      'Verifying files...',
+      'Loading Java...',
+      'Starting Minecraft...',
+    ];
+    
+    let progress = 0;
+    let stepIndex = 0;
+    
+    const interval = setInterval(() => {
+      progress += Math.random() * 8 + 4;
+      if (progress > 100) progress = 100;
+      
+      setLaunchProgress(progress);
+      
+      const newStep = Math.floor((progress / 100) * steps.length);
+      if (newStep !== stepIndex && newStep < steps.length) {
+        stepIndex = newStep;
+        setLaunchStatus(steps[stepIndex]);
+      }
+      
+      if (progress >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setLaunching(false);
+          setLaunchProgress(0);
+        }, 800);
+      }
+    }, 120);
+
+    try {
+      await invoke('launch_minecraft', {
+        options: {
+          instance_id: currentInstance.id,
+          java_path: 'java',
+          jvm_args: [`-Xmx${ramAllocation}G`, `--Xms${ramAllocation}G`],
+          memory_min: ramAllocation * 1024,
+          memory_max: ramAllocation * 1024,
+          game_directory: currentInstance.path,
+        }
+      });
+    } catch (error) {
+      console.error('Launch failed:', error);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (isNaN(date.getTime())) return dateString;
     
-    if (diffDays === 0) return 'Today';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const totalPlayTime = instances.reduce((acc, inst) => acc + inst.playTime, 0);
+  const totalMods = instances.reduce((acc, inst) => acc + inst.mods.length, 0);
+
+  const versionIcons: Record<string, string> = {
+    vanilla: '🌿',
+    fabric: '🧵',
+    forge: '⚒️',
+    quilt: '📦',
+  };
+
+  const versionTags: Record<string, { class: string; label: string }> = {
+    vanilla: { class: 'tag-release', label: 'Release' },
+    fabric: { class: 'tag-modded', label: 'Modded' },
+    forge: { class: 'tag-modded', label: 'Modded' },
+    quilt: { class: 'tag-beta', label: 'Beta' },
+  };
+
+  const getLastPlayedText = (lastPlayedAt: string | null) => {
+    if (!lastPlayedAt) return 'Never';
+    const date = new Date(lastPlayedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
   return (
-    <div className="content-area animate-fade-in">
-      {/* Header */}
-      <div className="flex-between mb-8">
-        <div>
-          <p className="text-small mb-1">Dashboard</p>
-          <h1 className="text-display">Welcome back!</h1>
-        </div>
-        <div className="flex gap-3">
-          <div className="card px-5 py-4 text-center min-w-[120px]">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Clock size={18} className="text-accent" />
-              <span className="text-2xl font-bold text-[var(--text-primary)]">{Math.floor(totalPlayTime / 60)}h</span>
-            </div>
-            <p className="text-small uppercase font-semibold tracking-wide">Playtime</p>
+    <>
+      {/* Launch Progress Overlay */}
+      <div className={`launch-progress ${launching ? 'visible' : ''}`}>
+        <div className="progress-modal">
+          <div className="progress-icon">⛏️</div>
+          <div className="progress-title">Launching Minecraft</div>
+          <div className="progress-sub">{launchStatus}</div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${launchProgress}%` }} />
           </div>
-          <div className="card px-5 py-4 text-center min-w-[120px]">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Zap size={18} className="text-accent" />
-              <span className="text-2xl font-bold text-[var(--text-primary)]">{totalMods}</span>
-            </div>
-            <p className="text-small uppercase font-semibold tracking-wide">Mods</p>
-          </div>
+          <div className="progress-pct">{Math.floor(launchProgress)}%</div>
         </div>
       </div>
 
-      {/* Quick Launch */}
-      {lastPlayed ? (
-        <div className="panel p-6 mb-8 animate-slide-up">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-xl bg-[var(--accent)] flex items-center justify-center shadow-lg">
-                <Gamepad2 size={32} className="text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="status-dot status-online" />
-                  <p className="text-accent text-sm font-semibold">Ready to play</p>
-                </div>
-                <h2 className="text-subtitle">{lastPlayed.name}</h2>
-                <div className="flex items-center gap-2 text-body mt-1">
-                  <span className="badge badge-accent">{lastPlayed.version}</span>
-                  <span>•</span>
-                  <span className="capitalize">{lastPlayed.modLoader}</span>
-                  <span>•</span>
-                  <span>{lastPlayed.mods.length} mods</span>
-                </div>
-              </div>
-            </div>
-            <button className="btn btn-primary btn-lg">
-              <Play size={20} fill="currentColor" />
-              <span>Launch</span>
-            </button>
-          </div>
+      <div className="topbar">
+        <div>
+          <div className="topbar-title">Good evening ✦</div>
+          <div className="topbar-sub">Ready to mine some blocks?</div>
         </div>
-      ) : (
-        <div className="panel p-8 text-center mb-8 animate-slide-up">
-          <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4">
-            <Package size={32} className="text-[var(--text-muted)]" />
+        <div className="topbar-right">
+          <div className="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(240,253,244,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" placeholder="Search versions, mods..." />
           </div>
-          <h2 className="text-subtitle mb-2">No Instances Yet</h2>
-          <p className="text-body mb-6">Create your first Minecraft instance to get started</p>
-          <button onClick={() => setView('instances')} className="btn btn-primary">
-            Create Instance
+          <button className="btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+          <button className="btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
           </button>
         </div>
-      )}
+      </div>
 
-      {/* News Feed */}
-      <div>
-        <div className="flex-between mb-5">
-          <h3 className="text-subtitle flex items-center gap-2">
-            <Newspaper size={22} className="text-accent" />
-            Mojang News
-          </h3>
-          {loading && <span className="text-small animate-pulse-soft">Loading...</span>}
+      <div className="content-area">
+        {/* Hero Card with 3D Pixel Scene */}
+        {currentInstance ? (
+          <div className="hero-card">
+            <div className="hero-bg" />
+            <div className="pixel-scene">
+              <div className="block-grid">
+                {BLOCK_GRID.flat().map((type, i) => (
+                  <div key={i} className={`blk blk-${type}`} />
+                ))}
+              </div>
+            </div>
+            <div className="hero-content">
+              <div className="hero-badge">
+                <span className="badge-dot" />
+                Java Edition Active
+              </div>
+              <div>
+                <div className="hero-title">
+                  {currentInstance.name}<br />
+                  <span>{currentInstance.version}</span>
+                </div>
+              </div>
+              <div className="hero-bottom">
+                <button className="btn-launch" onClick={handleLaunch} disabled={launching}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  PLAY NOW
+                </button>
+                <div className="hero-meta">
+                  <div className="meta-item">
+                    <div className="meta-label">Last Played</div>
+                    <div className="meta-val">{getLastPlayedText(currentInstance.lastPlayed)}</div>
+                  </div>
+                  <div className="meta-item">
+                    <div className="meta-label">Loader</div>
+                    <div className="meta-val capitalize">{currentInstance.modLoader}</div>
+                  </div>
+                  <div className="meta-item">
+                    <div className="meta-label">Mods</div>
+                    <div className="meta-val">{currentInstance.mods.length} active</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="hero-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px' }}>No Instances Yet</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Create your first Minecraft instance to start playing</p>
+            </div>
+          </div>
+        )}
+
+        {/* Versions Grid */}
+        <div>
+          <div className="section-header">
+            <div className="section-title">Your Instances</div>
+            <div className="section-link">
+              Manage all
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
+          </div>
+          <div className="versions-grid">
+            {instances.map((instance, index) => (
+              <div
+                key={instance.id}
+                className={`version-card ${selectedVersion?.id === instance.id ? 'selected' : ''}`}
+                onClick={() => setSelectedVersion(instance)}
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <div className={`version-icon vi-${instance.modLoader}`}>
+                  {versionIcons[instance.modLoader] || '⚡'}
+                </div>
+                <div className="version-name">{instance.name}</div>
+                <div className="version-num">{instance.version}</div>
+                <div className={`version-tag ${versionTags[instance.modLoader]?.class || 'tag-release'}`}>
+                  {versionTags[instance.modLoader]?.label || 'Release'}
+                </div>
+              </div>
+            ))}
+            {instances.length === 0 && (
+              <div className="version-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '30px' }}>
+                <div style={{ fontSize: '32px', marginBottom: '12px' }}>➕</div>
+                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Create your first instance</div>
+              </div>
+            )}
+          </div>
         </div>
-        
-        <div className="grid gap-3">
-          {news.map((item, index) => (
-            <a
-              key={index}
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card p-4 flex items-start gap-4 group"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="w-12 h-12 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
-                <Newspaper size={22} className="text-accent" />
+
+        {/* Bottom Row - News & Stats */}
+        <div className="bottom-row">
+          {/* News Feed */}
+          <div>
+            <div className="section-header">
+              <div className="section-title">Latest News</div>
+              <div className="section-link">
+                View all
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold text-[var(--text-primary)] group-hover:text-accent transition-colors line-clamp-1">
-                    {item.title}
-                  </h4>
+            </div>
+            <div className="news-list">
+              {loading ? (
+                <div className="news-item">
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading news...</div>
                 </div>
-                <p className="text-body text-sm line-clamp-2">{item.description}</p>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="badge badge-accent">{item.category}</span>
-                  <span className="text-small">{formatDate(item.publishedAt)}</span>
+              ) : (
+                news.map((item, index) => (
+                  <a
+                    key={index}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="news-item"
+                  >
+                    <div className={`news-thumb nt-${(index % 3) + 1}`}>
+                      {index === 0 ? '🌲' : index === 1 ? '🔮' : '🔥'}
+                    </div>
+                    <div className="news-content">
+                      <div className="news-title">{item.title}</div>
+                      <div className="news-date">{formatDate(item.publishedAt)}</div>
+                    </div>
+                    <div className="news-arrow">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </div>
+                  </a>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Stats Panel */}
+          <div>
+            <div className="section-header">
+              <div className="section-title">Your Stats</div>
+            </div>
+            <div className="stats-panel">
+              <div className="playtime-display">
+                <div className="playtime-num">{Math.floor(totalPlayTime / 60)}h</div>
+                <div className="playtime-label">Total Playtime</div>
+              </div>
+              <div className="stat-divider" />
+              <div className="stat-row">
+                <div className="stat-header">
+                  <span className="stat-name">RAM Usage</span>
+                  <span className="stat-value" style={{ color: 'var(--accent)' }}>{ramAllocation} GB / 16 GB</span>
+                </div>
+                <div className="stat-bar">
+                  <div className="stat-fill sf-green" style={{ width: `${(ramAllocation / 16) * 100}%` }} />
                 </div>
               </div>
-              <ExternalLink size={18} className="text-[var(--text-muted)] group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
-            </a>
-          ))}
+              <div className="stat-row">
+                <div className="stat-header">
+                  <span className="stat-name">Storage</span>
+                  <span className="stat-value" style={{ color: '#38bdf8' }}>2.4 GB</span>
+                </div>
+                <div className="stat-bar">
+                  <div className="stat-fill sf-sky" style={{ width: '15%' }} />
+                </div>
+              </div>
+              <div className="stat-row">
+                <div className="stat-header">
+                  <span className="stat-name">Mods Installed</span>
+                  <span className="stat-value" style={{ color: '#fbbf24' }}>{totalMods}</span>
+                </div>
+                <div className="stat-bar">
+                  <div className="stat-fill sf-amber" style={{ width: `${Math.min(totalMods * 2, 100)}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Launch Bar */}
+      <div className="launch-bar">
+        <div className="launch-version-select">
+          <span className="lvs-icon">{currentInstance ? versionIcons[currentInstance.modLoader] || '⚡' : '📦'}</span>
+          <div className="lvs-text">
+            <span className="lvs-name">{currentInstance ? `${currentInstance.name} ${currentInstance.version}` : 'No Instance'}</span>
+            <span className="lvs-num">{currentInstance ? 'Java Edition' : 'Select an instance'}</span>
+          </div>
+          <svg className="lvs-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+
+        <div className="launch-spacer" />
+
+        <div className="ram-control">
+          <div className="ram-label">
+            <span className="ram-val">{ramAllocation} GB</span>
+            <span className="ram-sub">RAM Allocated</span>
+          </div>
+          <input
+            type="range"
+            className="ram-slider"
+            min="2"
+            max="16"
+            value={ramAllocation}
+            step="1"
+            onChange={(e) => setRamAllocation(parseInt(e.target.value))}
+          />
+        </div>
+
+        <button 
+          className={`btn-launch-main ${launching ? 'launching' : ''}`}
+          onClick={handleLaunch}
+          disabled={launching || !currentInstance}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          {launching ? 'LAUNCHING...' : 'LAUNCH GAME'}
+        </button>
+      </div>
+    </>
   );
 }
