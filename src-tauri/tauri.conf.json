@@ -24,8 +24,7 @@
       }
     ],
     "security": {
-      "csp": null,
-      "dangerousUseIframePolicy": true
+      "csp": null
     }
   },
   "bundle": {
@@ -43,5 +42,11 @@
     "category": "Game",
     "shortDescription": "High-performance Minecraft launcher",
     "longDescription": "Velocity Launcher - A high-performance, modular Minecraft launcher focused on speed and user customization"
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "pubkey": ""
+    }
   }
 }
