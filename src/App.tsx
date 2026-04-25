@@ -1,50 +1,48 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { TitleBar } from './components/TitleBar';
+import { Sidebar } from './components/Sidebar';
+import { Home } from './pages/Home';
+import { Instances } from './pages/Instances';
+import { Servers } from './pages/Servers';
+import { Skins } from './pages/Skins';
+import { Settings } from './pages/Settings';
+import { useAppStore } from './stores/appStore';
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const { currentView } = useAppStore();
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const renderView = () => {
+    switch (currentView) {
+      case 'home':
+        return <Home />;
+      case 'instances':
+        return <Instances />;
+      case 'servers':
+        return <Servers />;
+      case 'skins':
+        return <Skins />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <Home />;
+    }
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="h-screen w-screen bg-gray-950 flex flex-col overflow-hidden">
+      {/* Custom Title Bar */}
+      <TitleBar />
+      
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar Navigation */}
+        <Sidebar />
+        
+        {/* Main View */}
+        <main className="flex-1 overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950">
+          {renderView()}
+        </main>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    </div>
   );
 }
 
