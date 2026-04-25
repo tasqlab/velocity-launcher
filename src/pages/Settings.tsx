@@ -1,415 +1,410 @@
-import { useState } from 'react';
-import { 
-  Monitor, 
-  Cpu, 
-  Palette, 
-  Bell, 
-  Download, 
-  User, 
-  Shield,
-  ChevronRight,
-  FolderOpen,
-  Globe
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../stores/appStore';
 
 type SettingsTab = 'general' | 'java' | 'appearance' | 'accounts' | 'downloads';
 
+interface JavaInfo {
+  version: string;
+  path: string;
+  is_valid: boolean;
+}
+
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { settings, updateSettings, accounts, activeAccount, setActiveAccount } = useAppStore();
+  const [javaInstalls, setJavaInstalls] = useState<JavaInfo[]>([]);
+  const [loadingJava, setLoadingJava] = useState(true);
 
-  const tabs = [
-    { id: 'general', icon: <Monitor size={18} />, label: 'General' },
-    { id: 'java', icon: <Cpu size={18} />, label: 'Java & Performance' },
-    { id: 'appearance', icon: <Palette size={18} />, label: 'Appearance' },
-    { id: 'accounts', icon: <User size={18} />, label: 'Accounts' },
-    { id: 'downloads', icon: <Download size={18} />, label: 'Downloads' },
-  ];
+  useEffect(() => {
+    loadJavaInstalls();
+  }, []);
 
-  const handleMemoryChange = (type: 'min' | 'max', value: number) => {
-    updateSettings({
-      memory: { ...settings.memory, [type]: value }
-    });
+  const loadJavaInstalls = async () => {
+    try {
+      const installs = await invoke<JavaInfo[]>('detect_java_installations');
+      setJavaInstalls(installs);
+    } catch (e) {
+      console.error('Failed to detect Java:', e);
+    } finally {
+      setLoadingJava(false);
+    }
   };
 
+  const tabs = [
+    { id: 'general', label: 'General', icon: '⚙️' },
+    { id: 'java', label: 'Java & Performance', icon: '☕' },
+    { id: 'appearance', label: 'Appearance', icon: '🎨' },
+    { id: 'accounts', label: 'Accounts', icon: '👤' },
+    { id: 'downloads', label: 'Downloads', icon: '📥' },
+  ];
+
+  const SettingRow = ({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--glass-border)' }}>
+      <div>
+        <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>{label}</div>
+        {description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{description}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '44px',
+        height: '24px',
+        borderRadius: '12px',
+        background: checked ? 'var(--accent)' : 'var(--glass-border)',
+        border: 'none',
+        cursor: 'pointer',
+        position: 'relative',
+        transition: 'all 0.2s'
+      }}
+    >
+      <div style={{
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        background: 'white',
+        position: 'absolute',
+        top: '3px',
+        left: checked ? '23px' : '3px',
+        transition: 'all 0.2s',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+      }} />
+    </button>
+  );
+
   return (
-    <div className="h-full flex animate-fade-in">
-      {/* Sidebar */}
-      <div className="w-56 border-r border-white/5 p-4">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-2">
-          Settings
-        </h2>
-        <nav className="space-y-1">
-          {tabs.map((tab) => (
+    <>
+      {/* Top Bar */}
+      <div className="topbar">
+        <div>
+          <div className="topbar-title">Settings</div>
+          <div className="topbar-sub">Configure your launcher</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <div style={{ 
+          width: '240px', 
+          padding: '20px', 
+          borderRight: '1px solid var(--glass-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as SettingsTab)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                activeTab === tab.id
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
-              }`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === tab.id ? 'rgba(74, 222, 128, 0.08)' : 'transparent',
+                color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                fontSize: '14px',
+                fontWeight: activeTab === tab.id ? 500 : 400,
+                textAlign: 'left',
+                width: '100%'
+              }}
             >
-              {tab.icon}
+              <span style={{ fontSize: '16px' }}>{tab.icon}</span>
               {tab.label}
             </button>
           ))}
-        </nav>
-      </div>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {activeTab === 'general' && (
-          <div className="space-y-6 max-w-2xl">
+        {/* Content */}
+        <div className="content-area" style={{ flex: 1, overflow: 'auto' }}>
+          {activeTab === 'general' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">General Settings</h3>
-              <p className="text-gray-400">Configure launcher behavior and preferences</p>
+              <div className="section-title" style={{ marginBottom: '20px' }}>General Settings</div>
+              
+              <SettingRow label="Close to Tray" description="Keep launcher running when closed">
+                <Toggle checked={settings.closeToTray} onChange={(v) => updateSettings({ closeToTray: v })} />
+              </SettingRow>
+              
+              <SettingRow label="Start Minimized" description="Start launcher minimized to system tray">
+                <Toggle checked={settings.startMinimized} onChange={(v) => updateSettings({ startMinimized: v })} />
+              </SettingRow>
+              
+              <SettingRow label="Check for Updates" description="Automatically check for launcher updates">
+                <Toggle checked={settings.checkUpdates} onChange={(v) => updateSettings({ checkUpdates: v })} />
+              </SettingRow>
+              
+              <SettingRow label="Discord Rich Presence" description="Show current game status in Discord">
+                <Toggle checked={settings.discordRpc} onChange={(v) => updateSettings({ discordRpc: v })} />
+              </SettingRow>
+              
+              <SettingRow label="Allow Beta Versions" description="Show experimental Minecraft versions">
+                <Toggle checked={settings.allowBeta} onChange={(v) => updateSettings({ allowBeta: v })} />
+              </SettingRow>
             </div>
+          )}
 
-            {/* Launch Settings */}
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Monitor size={18} className="text-emerald-400" />
-                Launch Settings
-              </h4>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Keep launcher open</p>
-                    <p className="text-sm text-gray-400">Don&apos;t close launcher when starting game</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Minimize to tray</p>
-                    <p className="text-sm text-gray-400">Minimize to system tray when closing</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={settings.minimizeToTray}
-                      onChange={(e) => updateSettings({ minimizeToTray: e.target.checked })}
-                    />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Discord Rich Presence</p>
-                    <p className="text-sm text-gray-400">Show game status in Discord</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={settings.discordRPC}
-                      onChange={(e) => updateSettings({ discordRPC: e.target.checked })}
-                    />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-              </div>
-            </section>
-
-            {/* Resolution Settings */}
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Monitor size={18} className="text-emerald-400" />
-                Default Resolution
-              </h4>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Width</label>
-                  <input
-                    type="number"
-                    value={settings.resolution.width}
-                    onChange={(e) => updateSettings({ 
-                      resolution: { ...settings.resolution, width: parseInt(e.target.value) || 1920 }
-                    })}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Height</label>
-                  <input
-                    type="number"
-                    value={settings.resolution.height}
-                    onChange={(e) => updateSettings({ 
-                      resolution: { ...settings.resolution, height: parseInt(e.target.value) || 1080 }
-                    })}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500/50"
-                  />
-                </div>
-              </div>
-              
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={settings.resolution.fullscreen}
-                  onChange={(e) => updateSettings({ 
-                    resolution: { ...settings.resolution, fullscreen: e.target.checked }
-                  })}
-                  className="checkbox-velocity"
-                />
-                <span className="text-white">Launch in fullscreen</span>
-              </label>
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'java' && (
-          <div className="space-y-6 max-w-2xl">
+          {activeTab === 'java' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">Java & Performance</h3>
-              <p className="text-gray-400">Configure JVM arguments and memory allocation</p>
-            </div>
-
-            {/* Memory Settings */}
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Cpu size={18} className="text-emerald-400" />
-                Memory Allocation
-              </h4>
+              <div className="section-title" style={{ marginBottom: '20px' }}>Java & Performance</div>
               
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-gray-400">Minimum Memory (MB)</label>
-                    <span className="text-sm font-medium text-emerald-400">{settings.memory.min} MB</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="256"
-                    max="4096"
-                    step="128"
-                    value={settings.memory.min}
-                    onChange={(e) => handleMemoryChange('min', parseInt(e.target.value))}
-                    className="w-full"
-                  />
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                  RAM Allocation
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-gray-400">Maximum Memory (MB)</label>
-                    <span className="text-sm font-medium text-emerald-400">{settings.memory.max} MB</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1024"
-                    max="32768"
-                    step="512"
-                    value={settings.memory.max}
-                    onChange={(e) => handleMemoryChange('max', parseInt(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                <p className="text-sm text-emerald-400">
-                  💡 Tip: Allocate 4-8GB for modded instances, 2-4GB for vanilla
-                </p>
-              </div>
-            </section>
-
-            {/* JVM Arguments */}
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Cpu size={18} className="text-emerald-400" />
-                JVM Arguments
-              </h4>
-              
-              <div className="space-y-3">
-                {settings.jvmArgs.map((arg, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={arg}
-                      onChange={(e) => {
-                        const newArgs = [...settings.jvmArgs];
-                        newArgs[index] = e.target.value;
-                        updateSettings({ jvmArgs: newArgs });
-                      }}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50"
-                    />
-                    <button
-                      onClick={() => {
-                        const newArgs = settings.jvmArgs.filter((_, i) => i !== index);
-                        updateSettings({ jvmArgs: newArgs });
-                      }}
-                      className="p-2 rounded-lg text-red-400 hover:bg-red-500/10"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => updateSettings({ jvmArgs: [...settings.jvmArgs, ''] })}
-                  className="w-full py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-white/40 transition-colors text-sm"
-                >
-                  + Add JVM Argument
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'appearance' && (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-white mb-1">Appearance</h3>
-              <p className="text-gray-400">Customize the look and feel of the launcher</p>
-            </div>
-
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Palette size={18} className="text-emerald-400" />
-                Theme Settings
-              </h4>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Glassmorphism Effects</p>
-                    <p className="text-sm text-gray-400">Enable blur and transparency effects</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={settings.glassmorphism}
-                      onChange={(e) => updateSettings({ glassmorphism: e.target.checked })}
-                    />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Accent Color</label>
-                  <div className="flex gap-3">
-                    {['#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#ec4899'].map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => updateSettings({ accentColor: color })}
-                        className={`w-10 h-10 rounded-xl transition-all ${
-                          settings.accentColor === color ? 'ring-2 ring-white scale-110' : 'hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'accounts' && (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-white mb-1">Accounts</h3>
-              <p className="text-gray-400">Manage your Minecraft accounts</p>
-            </div>
-
-            <div className="space-y-3">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className={`glass-card p-4 flex items-center gap-4 ${
-                    activeAccount === account.id ? 'ring-1 ring-emerald-500/50' : ''
-                  }`}
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold">
-                    {account.username[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-white">{account.username}</p>
-                    <p className="text-sm text-gray-400">
-                      {account.type === 'microsoft' ? 'Microsoft Account' : 'Offline Account'}
-                    </p>
-                  </div>
-                  {activeAccount === account.id ? (
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-sm font-medium">
-                      Active
+                <div style={{ 
+                  background: 'var(--glass-bg)', 
+                  border: '1px solid var(--glass-border)', 
+                  borderRadius: '12px', 
+                  padding: '20px' 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Maximum Memory</span>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--accent)' }}>
+                      {Math.round(settings.memory.max / 1024)} GB
                     </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="2"
+                    max="16"
+                    value={Math.round(settings.memory.max / 1024)}
+                    onChange={(e) => updateSettings({ memory: { ...settings.memory, max: parseInt(e.target.value) * 1024 } })}
+                    className="ram-slider"
+                    style={{ width: '100%' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <span>2 GB</span>
+                    <span>16 GB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                  Java Installation
+                </div>
+                <div style={{ 
+                  background: 'var(--glass-bg)', 
+                  border: '1px solid var(--glass-border)', 
+                  borderRadius: '12px', 
+                  padding: '16px' 
+                }}>
+                  {loadingJava ? (
+                    <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Detecting Java...</div>
+                  ) : javaInstalls.length === 0 ? (
+                    <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                      No Java installations found
+                    </div>
                   ) : (
-                    <button
-                      onClick={() => setActiveAccount(account.id)}
-                      className="glass-button px-4 py-2 text-sm"
-                    >
-                      Switch
-                    </button>
+                    javaInstalls.map((java, i) => (
+                      <div key={i} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: i === 0 ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
+                        border: i === 0 ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent',
+                        marginBottom: '8px'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 500 }}>Java {java.version}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{java.path}</div>
+                        </div>
+                        {i === 0 && <span className="tag-release" style={{ fontSize: '10px' }}>Recommended</span>}
+                      </div>
+                    ))
                   )}
                 </div>
-              ))}
-
-              <button className="w-full glass-card p-4 flex items-center justify-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                <User size={18} />
-                Add Microsoft Account
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'downloads' && (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-white mb-1">Downloads</h3>
-              <p className="text-gray-400">Configure download settings</p>
-            </div>
-
-            <section className="glass-panel p-5">
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Download size={18} className="text-emerald-400" />
-                Download Settings
-              </h4>
-              
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-gray-400">Concurrent Downloads</label>
-                    <span className="text-sm font-medium text-emerald-400">{settings.downloadThreads}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="16"
-                    step="1"
-                    value={settings.downloadThreads}
-                    onChange={(e) => updateSettings({ downloadThreads: parseInt(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Instance Path</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={settings.instancePath || 'Default'}
-                      readOnly
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm"
-                    />
-                    <button className="glass-button px-4 py-2.5">
-                      <FolderOpen size={18} />
-                    </button>
-                  </div>
-                </div>
               </div>
-            </section>
-          </div>
-        )}
+
+              <SettingRow label="JVM Arguments" description="Custom Java arguments">
+                <button className="btn-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </SettingRow>
+            </div>
+          )}
+
+          {activeTab === 'appearance' && (
+            <div>
+              <div className="section-title" style={{ marginBottom: '20px' }}>Appearance</div>
+              
+              <SettingRow label="Theme" description="Choose your preferred look">
+                <select
+                  value={settings.theme}
+                  onChange={(e) => updateSettings({ theme: e.target.value as 'dark' | 'light' })}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--glass-bg)',
+                    border: '1px solid var(--glass-border)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                </select>
+              </SettingRow>
+              
+              <SettingRow label="Accent Color" description="Choose accent color">
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
+                    <button
+                      key={color}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: color,
+                        border: settings.accentColor === color ? '2px solid white' : '2px solid transparent',
+                        cursor: 'pointer',
+                        boxShadow: settings.accentColor === color ? `0 0 10px ${color}` : 'none'
+                      }}
+                      onClick={() => updateSettings({ accentColor: color })}
+                    />
+                  ))}
+                </div>
+              </SettingRow>
+              
+              <SettingRow label="Animations" description="Enable UI animations">
+                <Toggle checked={settings.animations} onChange={(v) => updateSettings({ animations: v })} />
+              </SettingRow>
+            </div>
+          )}
+
+          {activeTab === 'accounts' && (
+            <div>
+              <div className="section-title" style={{ marginBottom: '20px' }}>Accounts</div>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <button className="btn-launch-main" style={{ width: '100%', justifyContent: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                    <polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+                  </svg>
+                  Add Microsoft Account
+                </button>
+              </div>
+
+              {accounts.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px', 
+                  background: 'var(--glass-bg)', 
+                  borderRadius: '16px',
+                  border: '1px solid var(--glass-border)'
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>👤</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No accounts added yet</div>
+                </div>
+              ) : (
+                accounts.map(account => (
+                  <div key={account.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    padding: '16px',
+                    background: 'var(--glass-bg)',
+                    borderRadius: '12px',
+                    border: activeAccount === account.id ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                    marginBottom: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ 
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #064e3b, #065f46)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '18px'
+                      }}>
+                        {account.username[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 500 }}>{account.username}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Microsoft Account</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {activeAccount === account.id && (
+                        <span className="tag-release">Active</span>
+                      )}
+                      <button 
+                        className="btn-icon"
+                        onClick={() => setActiveAccount(account.id)}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'downloads' && (
+            <div>
+              <div className="section-title" style={{ marginBottom: '20px' }}>Downloads</div>
+              
+              <SettingRow label="Download Location" description="Where game files are stored">
+                <button className="btn-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+              </SettingRow>
+              
+              <SettingRow label="Download Speed" description="Limit download speed">
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--glass-bg)',
+                    border: '1px solid var(--glass-border)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option>Unlimited</option>
+                  <option>10 MB/s</option>
+                  <option>5 MB/s</option>
+                  <option>2 MB/s</option>
+                </select>
+              </SettingRow>
+              
+              <SettingRow label="Auto-update Mods" description="Automatically update mods when new versions are available">
+                <Toggle checked={true} onChange={() => {}} />
+              </SettingRow>
+              
+              <SettingRow label="Clear Cache" description="Clear downloaded assets cache">
+                <button 
+                  className="btn-launch-main" 
+                  style={{ padding: '8px 16px', fontSize: '12px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+                >
+                  Clear
+                </button>
+              </SettingRow>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
