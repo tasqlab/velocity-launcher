@@ -1,0 +1,38 @@
+[package]
+name = "velocity-launcher"
+version = "0.1.0"
+description = "Velocity Launcher - High-performance Minecraft launcher"
+authors = ["Velocity Team"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "velocity_launcher_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+anyhow = "1"
+thiserror = "2"
+zip = "2"
+sha2 = "0.10"
+hex = "0.4"
+async-trait = "0.1"
+
