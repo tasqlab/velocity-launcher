@@ -2,8 +2,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchOptions {
     pub instance_id: String,
@@ -21,6 +19,15 @@ pub struct SystemInfo {
     pub version: String,
     pub total_memory: u64,
     pub available_memory: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MojangArticle {
+    pub title: String,
+    pub description: String,
+    pub url: String,
+    pub published_at: String,
+    pub category: String,
 }
 
 /// Get system information for optimization suggestions
@@ -130,6 +137,44 @@ async fn open_folder(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Fetch Mojang news from their RSS feed
+#[tauri::command]
+async fn fetch_mojang_news() -> Result<Vec<MojangArticle>, String> {
+    // For now, return mock data - in production this would fetch from Mojang's API
+    let articles = vec![
+        MojangArticle {
+            title: "Minecraft 1.21 Update: The Tricky Trials".to_string(),
+            description: "Explore new trial chambers, meet the breeze, and craft with the mace!".to_string(),
+            url: "https://www.minecraft.net/article/tricky-trials-update".to_string(),
+            published_at: chrono::Utc::now().to_rfc3339(),
+            category: "Update".to_string(),
+        },
+        MojangArticle {
+            title: "Minecraft Realms Plus - New Content".to_string(),
+            description: "Discover new maps, skins, and texture packs available now.".to_string(),
+            url: "https://www.minecraft.net/realms".to_string(),
+            published_at: (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339(),
+            category: "Realms".to_string(),
+        },
+        MojangArticle {
+            title: "Community Spotlight: Amazing Builds".to_string(),
+            description: "Check out the most impressive community creations this week.".to_string(),
+            url: "https://www.minecraft.net/community".to_string(),
+            published_at: (chrono::Utc::now() - chrono::Duration::days(2)).to_rfc3339(),
+            category: "Community".to_string(),
+        },
+        MojangArticle {
+            title: "Java Edition Technical Updates".to_string(),
+            description: "Performance improvements and bug fixes in the latest snapshot.".to_string(),
+            url: "https://www.minecraft.net/snapshots".to_string(),
+            published_at: (chrono::Utc::now() - chrono::Duration::days(3)).to_rfc3339(),
+            category: "Technical".to_string(),
+        },
+    ];
+    
+    Ok(articles)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -148,6 +193,7 @@ pub fn run() {
             launch_minecraft,
             get_default_instance_path,
             open_folder,
+            fetch_mojang_news,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

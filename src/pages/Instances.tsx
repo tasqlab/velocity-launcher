@@ -66,15 +66,15 @@ export function Instances() {
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Header */}
-      <div className="p-6 border-b border-white/5">
+      <div className="p-8 border-b border-[var(--border)]">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Instances</h1>
-            <p className="text-gray-400">Manage your Minecraft installations</p>
+            <p className="text-small mb-1">Management</p>
+            <h1 className="text-title">Instances</h1>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="glass-button-primary px-4 py-2.5 flex items-center gap-2"
+            className="btn btn-primary flex items-center gap-2"
           >
             <Plus size={18} />
             Create Instance
