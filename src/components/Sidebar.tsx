@@ -4,6 +4,7 @@ import type { View } from '../types';
 const navItems: { id: View; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z' },
   { id: 'instances', label: 'Instances', icon: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' },
+  { id: 'mods', label: 'Mods', icon: 'M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z' },
   { id: 'servers', label: 'Servers', icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' },
   { id: 'settings', label: 'Settings', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.5-4.5a7.5 7.5 0 0 0-1-1.8l1.4-2.5-2.2-2.2-2.5 1.4a7.5 7.5 0 0 0-1.8-1L12 1.5h-3l-.9 2.7a7.5 7.5 0 0 0-1.8 1L3.8 4.8 1.6 7l1.4 2.5a7.5 7.5 0 0 0-1 1.8L.5 12v3l2.7.9a7.5 7.5 0 0 0 1 1.8l-1.4 2.5 2.2 2.2 2.5-1.4a7.5 7.5 0 0 0 1.8 1L9 22.5h3l.9-2.7a7.5 7.5 0 0 0 1.8-1l2.5 1.4 2.2-2.2-1.4-2.5a7.5 7.5 0 0 0 1-1.8l2.7-.9v-3l-2.7-.9z' },
 ];

@@ -4,6 +4,8 @@ import { Home } from './pages/Home';
 import { Instances } from './pages/Instances';
 import { Servers } from './pages/Servers';
 import { Settings } from './pages/Settings';
+import { Mods } from './pages/Mods';
+import { InstanceDetails } from './pages/InstanceDetails';
 import { useAppStore } from './stores/appStore';
 
 function App() {
@@ -17,6 +19,10 @@ function App() {
         return <Instances />;
       case 'servers':
         return <Servers />;
+      case 'mods':
+        return <Mods />;
+      case 'instanceDetails':
+        return <InstanceDetails />;
       case 'settings':
         return <Settings />;
       default:

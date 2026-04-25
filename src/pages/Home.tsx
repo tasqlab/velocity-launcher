@@ -28,6 +28,8 @@ export function Home() {
   const [launchStatus, setLaunchStatus] = useState('Preparing...');
   const [selectedVersion, setSelectedVersion] = useState<Instance | null>(null);
   const [ramAllocation, setRamAllocation] = useState(4);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [offlineUsername, setOfflineUsername] = useState('Player');
   
   const activeAcc = accounts.find(a => a.id === activeAccount);
   const lastPlayed = getLastPlayedInstance();
@@ -87,16 +89,34 @@ export function Home() {
     }, 120);
 
     try {
-      await invoke('launch_minecraft', {
-        options: {
-          instance_id: currentInstance.id,
-          java_path: 'java',
-          jvm_args: [`-Xmx${ramAllocation}G`, `--Xms${ramAllocation}G`],
-          memory_min: ramAllocation * 1024,
-          memory_max: ramAllocation * 1024,
-          game_directory: currentInstance.path,
-        }
-      });
+      if (offlineMode) {
+        // Offline mode - no authentication needed
+        await invoke('launch_offline', {
+          options: {
+            instance_id: currentInstance.id,
+            java_path: 'java',
+            jvm_args: [`-Xmx${ramAllocation}G`, `-Xms${ramAllocation}G`],
+            memory_min: ramAllocation * 1024,
+            memory_max: ramAllocation * 1024,
+            game_directory: currentInstance.path,
+          },
+          version: currentInstance.version,
+          username: offlineUsername
+        });
+      } else {
+        // Online mode - requires Microsoft authentication
+        await invoke('launch_minecraft', {
+          options: {
+            instance_id: currentInstance.id,
+            java_path: 'java',
+            jvm_args: [`-Xmx${ramAllocation}G`, `-Xms${ramAllocation}G`],
+            memory_min: ramAllocation * 1024,
+            memory_max: ramAllocation * 1024,
+            game_directory: currentInstance.path,
+          },
+          version: currentInstance.version
+        });
+      }
     } catch (error) {
       console.error('Launch failed:', error);
     }
@@ -403,6 +423,48 @@ export function Home() {
             step="1"
             onChange={(e) => setRamAllocation(parseInt(e.target.value))}
           />
+        </div>
+
+        {/* Offline Mode Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
+          <button
+            onClick={() => setOfflineMode(!offlineMode)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: offlineMode ? '1px solid #f59e0b' : '1px solid var(--glass-border)',
+              background: offlineMode ? 'rgba(245, 158, 11, 0.15)' : 'var(--glass-bg)',
+              color: offlineMode ? '#f59e0b' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              transition: 'all 0.2s'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+            Offline
+          </button>
+          {offlineMode && (
+            <input
+              type="text"
+              value={offlineUsername}
+              onChange={(e) => setOfflineUsername(e.target.value)}
+              placeholder="Username"
+              style={{
+                width: '80px',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: '1px solid var(--glass-border)',
+                background: 'var(--glass-bg)',
+                color: 'var(--text-primary)',
+                fontSize: '12px'
+              }}
+            />
+          )}
         </div>
 
         <button 

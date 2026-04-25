@@ -109,6 +109,11 @@ export function Instances() {
     setView('home');
   };
 
+  const handleViewInstance = (instance: Instance) => {
+    selectInstance(instance.id);
+    setView('instanceDetails');
+  };
+
   const versionIcons: Record<string, string> = {
     vanilla: '🌿',
     fabric: '🧵',
@@ -188,6 +193,16 @@ export function Instances() {
                       <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
                     Play
+                  </button>
+                  <button 
+                    className="btn-icon" 
+                    style={{ padding: '8px' }}
+                    onClick={() => handleViewInstance(instance)}
+                    title="View Details"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    </svg>
                   </button>
                   <button 
                     className="btn-icon" 

@@ -1167,6 +1167,7 @@ body {
 
 .ram-slider {
   -webkit-appearance: none;
+  appearance: none;
   width: 100px;
   height: 4px;
   border-radius: 2px;
@@ -1177,6 +1178,7 @@ body {
 
 .ram-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 50%;

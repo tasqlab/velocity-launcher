@@ -189,7 +189,7 @@ export interface MinecraftServer {
 }
 
 // UI Types
-export type View = 'home' | 'instances' | 'modpacks' | 'servers' | 'skins' | 'settings';
+export type View = 'home' | 'instances' | 'modpacks' | 'servers' | 'skins' | 'mods' | 'instanceDetails' | 'settings';
 
 export interface Toast {
   id: string;
